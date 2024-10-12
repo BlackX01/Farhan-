@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pick and Place Robot - Joint Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: White;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: black;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .slider-container {
+            margin: 20px 0;
+        }
+
+        .slider-container input {
+            width: 300px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: brown;
+            color: white;
+            border: saddlebrown;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: purple;
+        }
+
+        #wrist-dc-control {
+            margin-top: 20px;
+        }
+
+        #bluetooth-status {
+            margin: 10px 0;
+            color: lightgreen;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Pick and Place Robot - Joint Control</h1>
+
+    <!-- Connect to Bluetooth Button -->
+    <button onclick="connectToBluetooth()">Connect to Bluetooth</button>
+    <div id="bluetooth-status">Status: Disconnected</div>
+
+    <!-- Slider for Base Servo (270°) -->
+    <div class="slider-container">
+        <label for="baseServo">Base Servo (0-270°): <span id="baseAngle">135</span>°</label>
+        <input type="range" id="baseServo" min="0" max="270" value="135" oninput="updateServoAngle('baseServo', 'baseAngle')">
+    </div>
+
+    <!-- Slider for Arm Servo 1 (180°) -->
+    <div class="slider-container">
+        <label for="armServo1">Arm Servo 1 (0-180°): <span id="arm1Angle">90</span>°</label>
+        <input type="range" id="armServo1" min="0" max="180" value="90" oninput="updateServoAngle('armServo1', 'arm1Angle')">
+    </div>
+
+    <!-- Slider for Arm Servo 2 (180°) -->
+    <div class="slider-container">
+        <label for="armServo2">Arm Servo 2 (0-180°): <span id="arm2Angle">90</span>°</label>
+        <input type="range" id="armServo2" min="0" max="180" value="90" oninput="updateServoAngle('armServo2', 'arm2Angle')">
+    </div>
+
+    <!-- Slider for Wrist Rotation (360°) -->
+    <div class="slider-container">
+        <label for="wristServo">Wrist Rotation (0-360°): <span id="wristAngle">180</span>°</label>
+        <input type="range" id="wristServo" min="0" max="360" value="180" oninput="updateServoAngle('wristServo', 'wristAngle')">
+    </div>
+
+    <!-- Wrist Movement using DC Motors -->
+    <div id="wrist-dc-control">
+        <button onclick="sendBluetoothCommand('wrist_up')">Wrist Up</button>
+        <button onclick="sendBluetoothCommand('wrist_down')">Wrist Down</button>
+    </div>
+
+    <script>
+        let bluetoothDevice;
+        let bluetoothCharacteristic;
+        const bluetoothStatus = document.getElementById('bluetooth-status');
+
+        // Connect to Bluetooth when the user clicks the button
+        async function connectToBluetooth() {
+            try {
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: ['00001101-0000-1000-8000-00805f9b34fb'] }] // Generic UUID for serial devices (like HC-05)
+                });
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService('00001101-0000-1000-8000-00805f9b34fb');
+                bluetoothCharacteristic = await service.getCharacteristic('00001101-0000-1000-8000-00805f9b34fb');
+                bluetoothStatus.textContent = "Status: Connected";
+                console.log('Bluetooth connected');
+            } catch (error) {
+                console.error('Bluetooth connection failed:', error);
+                bluetoothStatus.textContent = "Status: Failed to Connect";
+            }
+        }
+
+        // Send servo angles or motor commands to Arduino via Bluetooth
+        async function sendBluetoothCommand(command) {
+            if (!bluetoothCharacteristic) {
+                alert("Bluetooth not connected! Please connect first.");
+                return;
+            }
+            let encoder = new TextEncoder();
+            let commandBuffer = encoder.encode(command + "\n");
+            await bluetoothCharacteristic.writeValue(commandBuffer);
+            console.log('Sent command:', command);
+        }
+
+        // Update servo angle when the slider is changed
+        function updateServoAngle(servoId, displayId) {
+            const angle = document.getElementById(servoId).value;
+            document.getElementById(displayId).textContent = angle;
+            sendBluetoothCommand(`${servoId}:${angle}`);
+        }
+    </script>
+</body>
+</html>
